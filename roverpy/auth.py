@@ -14,6 +14,7 @@ from rover_universe_sdk.api import AssetsApi
 from rover_universe_sdk.models.get_external_id_mappings_request import GetExternalIdMappingsRequest
 from rover_universe_sdk.models.get_external_id_mappings_response import GetExternalIdMappingsResponse
 from rover_universe_sdk.api.external_id_mappings_api import ExternalIdMappingsApi
+
 @dataclass
 class Header: 
     """Header object which represents your authorization
@@ -58,11 +59,8 @@ def create_headers(yieldx_credentials: dict) -> Header:
 
     return header
 
-def load_elastic_search_credentials(settings_json_path: str = 'settings.json') -> ElasticSearchCredentials: 
-    with open(settings_json_path, 'r') as f: 
-        paths = json.load(f)
+def load_elastic_search_credentials(dotenv_path: str) -> ElasticSearchCredentials: 
 
-    dotenv_path = paths['dotenv_path']
     load_dotenv(dotenv_path = dotenv_path)
 
     cloudid = os.environ['ELASTIC_SEARCH_CLOUD_ID']
@@ -77,11 +75,10 @@ def load_elastic_search_credentials(settings_json_path: str = 'settings.json') -
 
     return es_credentials
 
-def load_yieldx_credentials(settings_json_path: str = 'settings.json') -> Credentials: 
-    with open(settings_json_path, 'r') as f: 
-        paths = json.load(f)
+def load_yieldx_credentials(dotenv_path: str) -> Credentials: 
+    load_dotenv(dotenv_path=dotenv_path)
 
-    yieldx_credentials_path = paths['yieldx_credentials_path']
+    yieldx_credentials_path = os.environ['YIELDX_CREDENTIALS_PATH']
 
     # Then we are going to create your yieldx credentials
     with open(yieldx_credentials_path, 'r') as f: 
@@ -97,22 +94,22 @@ def load_yieldx_credentials(settings_json_path: str = 'settings.json') -> Creden
 
     return credentials
 
-def load_headers(settings_json_path: str = 'settings.json') -> Header: 
-    yx = load_yieldx_credentials(settings_json_path=settings_json_path)
+def load_headers(dotenv_path: str) -> Header: 
+    yx = load_yieldx_credentials(dotenv_path=dotenv_path)
 
     headers = create_headers(yieldx_credentials=yx)
 
     return headers
 
 
-def load_credentials(settings_json_path: str = 'settings.json') -> Tuple[ElasticSearchCredentials, Credentials, Header]: 
-    es_credentials = load_elastic_search_credentials(settings_json_path=settings_json_path)
-    yx_credentials = load_yieldx_credentials(settings_json_path=settings_json_path)
-    headers = load_headers(settings_json_path=settings_json_path)
+def load_credentials(dotenv_path: str) -> Tuple[ElasticSearchCredentials, Credentials, Header]: 
+    es_credentials = load_elastic_search_credentials(dotenv_path=dotenv_path)
+    yx_credentials = load_yieldx_credentials(dotenv_path=dotenv_path)
+    headers = load_headers(dotenv_path=dotenv_path)
 
     return es_credentials, yx_credentials, headers
 
-def create_es(settings_json_path: str = 'settings.json') -> Elasticsearch: 
+def create_es(dotenv_path: str) -> Elasticsearch: 
     """Creates an Elasticsearch object using information in a json file
 
     Args:
@@ -122,7 +119,7 @@ def create_es(settings_json_path: str = 'settings.json') -> Elasticsearch:
         Elasticsearch: Elasticsearch object to run searches through
     """
 
-    es_credentials = load_elastic_search_credentials(settings_json_path=settings_json_path)
+    es_credentials = load_elastic_search_credentials(dotenv_path=dotenv_path)
 
     es = Elasticsearch(
         cloud_id=es_credentials.cloudid, 
