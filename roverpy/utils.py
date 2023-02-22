@@ -1,11 +1,14 @@
 import datetime
 import uuid
+import pandas as pd 
 
-from auth import Header
+from elastic_transport import ObjectApiResponse
 from typing import List
 from rover_optimizer_sdk.models import Portfolio, Position
 from rover_optimizer_sdk.models import WhitelistItem
 from enum import Enum
+
+from roverpy.auth import Header
 
 class PortfolioStatus(Enum): 
 
@@ -37,7 +40,7 @@ def create_cash_position(amount: int, port_id: str = None) -> Position:
     return cash_position
 
 
-def create_cash_portfolio(amount: int, port_id: None, created_at: str = None, 
+def create_cash_portfolio(amount: int, port_id: str = None, created_at: str = None, 
 currency: str = "USD", status: str = PortfolioStatus.READY, port_name: str = "Random") -> Portfolio: 
     """Creates a random cash portfolio with an amount you specify. 
 
@@ -82,4 +85,43 @@ def create_whitelist(asset_ids: List[str]) -> List[WhitelistItem]:
         whitelist.append(whitelist_item)
 
     return whitelist
+
+def create_whitelist_from_search(elastic_search_response: ObjectApiResponse) -> List[WhitelistItem]: 
+    """Creates a whitelist from an elastic search
+
+    Args:
+        elastic_search_response (ObjectApiResponse): Response object from elastic search in python
+
+    Returns:
+        List[WhitelistItem]: A list of whitelist items to put into your optimization
+    """
+
+    hits = elastic_search_response['hits']['hits']
+
+    whitelist = []
+
+    for hit in hits: 
+        asset_id = hit["_id"]
+        item = WhitelistItem(asset_id=asset_id)
+        whitelist.append(item)
+
+    return whitelist
+
+
+
+def portfolio_to_dataframe(portfolio: Portfolio) -> pd.DataFrame: 
+    """Converts the positions in a portfolio objects into a dataframe
+
+    Args:
+        portfolio (Portfolio): Portfolio object
+
+    Returns:
+        pd.DataFrame: Pandas dataframe representing the data in the portfolio object
+    """
+
+    df = pd.DataFrame.from_records(data = [pos.to_dict() for pos in portfolio.positions])
+
+    return df
+
+
 
