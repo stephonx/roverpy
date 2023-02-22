@@ -1,7 +1,23 @@
 import pandas as pd 
 import requests
 
+from rover_optimizer_sdk.models import (
+    WhitelistItem, 
+    Portfolio, 
+    Position
+)
 from rover_universe_sdk.models import Asset, Bond
+from rover_universe_sdk.api import AssetsApi
+from rover_universe_sdk.models.get_asset_response import GetAssetResponse
+from rover_universe_sdk.models.get_assets_request import GetAssetsRequest
+
+from rover_portfolio_analyzer_sdk.api import PortfolioAnalyzerApi
+from rover_portfolio_analyzer_sdk.models.analyze_portfolio_request import AnalyzePortfolioRequest
+from rover_portfolio_analyzer_sdk.models.analyze_portfolio_response import AnalyzePortfolioResponse
+
+from roverpy.utils import portfolio_to_dataframe
+
+from elastic_transport import ObjectApiResponse
 from typing import List 
 
 
@@ -47,7 +63,7 @@ def get_live_offers(cusips: List[str], headers: dict) -> pd.DataFrame:
     return offers_df
 
 
-def extract_asset_info(asset: Asset) -> dict: 
+def extract_asset_info(asset: Asset) -> dict:
     info = {} 
 
     if asset.identifiers is not None: 
@@ -65,3 +81,50 @@ def extract_asset_info(asset: Asset) -> dict:
         info['sector'] = asset.bond.issuer.sector      
 
     return info
+
+def create_summary_df(portfolio: Portfolio, asset_api: AssetsApi, analyzer_api: PortfolioAnalyzerApi) -> pd.DataFrame: 
+    """Creates a summary dataframe from a portfolio response object
+
+    Args:
+        portfolio (Portfolio): Target portfolio to turn into a dataframe
+
+    Returns:
+        pd.DataFrame: Dataframe which shows useful information for these set of positions
+    """
+
+    def extract_asset_information(asset: Asset) -> dict: 
+        info = {} 
+
+        info['asset_id'] = asset.id
+        info['cusip'] = asset.identifiers.cusip 
+        info['description'] = asset.description
+        info['yield'] = asset.analytics._yield
+
+        return info
+    
+    portfolio_df = portfolio_to_dataframe(portfolio=portfolio)
+
+    # Preparing the get assets request so we can see basic information
+    asset_ids = list(portfolio_df['asset_id'])
+    asset_ids.remove("USD")
+
+    get_assets_request = GetAssetsRequest(asset_ids=asset_ids)
+    get_assets_response = asset_api.get_assets(get_assets_request = get_assets_request)
+
+    asset_information = [extract_asset_information(asset) for asset in get_assets_response.assets]
+    df = pd.DataFrame.from_records(asset_information)
+    merged_df = portfolio_df.merge(right = df, how = 'left', on = 'asset_id')
+
+    # Then we get the weight information from the api using the analyzer service
+    analyze_request = AnalyzePortfolioRequest(
+    portfolio=portfolio
+    )
+
+    analyze_response = analyzer_api.analyze_portfolio(analyze_portfolio_request = analyze_request)
+
+    weights = analyze_response.analysis.weights
+    weights_df = pd.DataFrame.from_records([w.to_dict() for w in weights])
+
+    final_summary_df = merged_df.merge(weights_df, how = 'left', left_on = 'id', right_on = 'position_id')
+    cols = ['asset_id', 'cusip', 'description', 'quantity', 'yield', 'weight']
+    return final_summary_df[cols]
